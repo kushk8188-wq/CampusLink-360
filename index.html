@@ -508,7 +508,18 @@ let items=[...DEMO];
 let saved=load("cl_saved",[]),tab="Browse",cat="All",qs="",sortBy="new";
 const sv=()=>save("cl_saved",saved);
 const SB="https://okezsutcryfhimyiqmxd.supabase.co/rest/v1/items",H={apikey:"sb_publishable_pfhK5rqSG0RkzUw-37__FA_L6RlPhrq","Content-Type":"application/json"};
-let mine=load("cl_mine",[]);
+let mine=load("cl_mine",[]),mineC=load("cl_minec",[]),cst=load("cl_cst",{}),adm=load("cl_adm",null);
+const AU="https://okezsutcryfhimyiqmxd.supabase.co",SC=AU+"/rest/v1/complaints";
+if(user&&user.role==="adm"&&!(adm&&adm.exp>Date.now())){user=null;save("cl_user",null)}
+const isA=()=>!!(adm&&user&&user.role==="adm"&&adm.exp>Date.now());
+const AHd=()=>({...H,Authorization:"Bearer "+adm.t,Prefer:"return=representation"});
+async function adel(u,id,cb){try{const r=await fetch(u+"?id=eq."+id,{method:"DELETE",headers:AHd()});const j=await r.json();if(!r.ok||!j.length)throw 0;toast("Deleted");cb()}catch(e){toast("Delete failed. Log in as admin again")}}
+async function cupd(c,o){try{const r=await fetch(SC+"?id=eq."+c.db,{method:"PATCH",headers:AHd(),body:JSON.stringify(o)});const j=await r.json();if(!r.ok||!j.length)throw 0;pullC()}catch(e){toast("Update failed. Log in as admin again")}}
+async function adminLogin(){const nm=$("#an").value.trim().toLowerCase().replace(/\s+/g," "),pw=$("#ap").value;
+  try{if(nm!=="kush kumar")throw 0;const r=await fetch(AU+"/auth/v1/token?grant_type=password",{method:"POST",headers:H,body:JSON.stringify({email:"admin@campuslink360.app",password:pw})});const j=await r.json();if(!r.ok||!j.access_token)throw 0;
+    adm={t:j.access_token,exp:Date.now()+(j.expires_in-60)*1000};save("cl_adm",adm);user={role:"adm",name:"Kush Kumar",uni:UNIS[0]};save("cl_user",user);applyUser();pull();pullC()}catch(e){toast("Wrong admin name or password")}}
+async function pullC(){try{const r=await fetch(SC+"?select=*&order=created_at.desc&limit=100",{headers:H});if(!r.ok)throw 0;const rows=await r.json();
+  cmp=[...rows.map(x=>{const id=x.id+1000;return{id,db:x.id,tk:x.tk,t:x.t,x:x.x,cat:x.cat,loc:x.loc,st:x.st,to:x.assigned||"Not assigned yet",pr:x.pr,v:x.v,note:x.note||"",own:mineC.includes(x.id)?1:0,...cst[id]}}),...CDEMO];drawCmp()}catch(e){toast("Could not load reports")}}
 const ago=t=>{const m=(Date.now()-new Date(t))/6e4;return m<2?"Just now":m<60?Math.floor(m)+" min ago":m<1440?Math.floor(m/60)+" hr ago":Math.floor(m/1440)+" days ago"};
 async function pull(){try{const r=await fetch(SB+"?select=*&sold=eq.false&order=created_at.desc&limit=40",{headers:H});if(!r.ok)throw 0;const rows=await r.json();
   items=[...rows.map(x=>({id:x.id+1000,db:x.id,n:x.n,c:x.c,p:+x.p,u:x.u||"",per:+x.per||0,cond:x.cond||"",s:x.s,d:x.d||"",out:x.outside?1:0,ds:x.ds||"",w:x.w||"",img:x.img||"",dt:ago(x.created_at),own:mine.includes(x.id)?1:0})),...DEMO];drawGrid()}catch(e){toast("Could not load shared listings")}}
@@ -521,11 +532,12 @@ $("#chips").onclick=e=>{const b=e.target.closest("button");if(b){cat=b.dataset.c
 function drawGrid(){
   const l=items.filter(i=>!i.sold&&(tab==="Saved"?saved.includes(i.id):tab==="My listings"?i.own:tab==="Free"?!i.p:tab==="Outside campus"?i.out:1)&&(cat==="All"||i.c===cat)&&i.n.toLowerCase().includes(qs));
   if(sortBy==="lo")l.sort((a,b)=>a.p-b.p);else if(sortBy==="hi")l.sort((a,b)=>b.p-a.p);
-  $("#grid").innerHTML=l.length?l.map(i=>`<article class="card item"><div class="tile" style="background:${tn(i.c)}" data-a="view" data-id="${i.id}" role="button" tabindex="0" aria-label="View ${esc(i.n)}">${tileArt(i)}</div><div class="body"><div class="fl"><h3>${esc(i.n)}</h3><button class="chip" data-a="save" data-id="${i.id}" aria-label="Save item">${saved.includes(i.id)?"♥":"♡"}</button></div><div class="price">${pr(i)}</div><div><span class="tag">${esc(i.cond)}</span> <span class="tag">${esc(i.dt)}</span>${i.out?` <span class="tag">Outside campus</span>`:""}</div><div class="hint"><b>${esc(i.s)}</b><br>${esc(i.d)}</div><div class="fl" style="justify-content:flex-start;margin-top:auto"><button class="btn dark" data-a="view" data-id="${i.id}">View</button>${i.own?`<button class="btn ghost" data-a="sold" data-id="${i.id}">Mark as sold</button>`:""}</div></div></article>`).join(""):`<div class="empty">Nothing here yet. Change the filter or list your own item.</div>`;
+  $("#grid").innerHTML=l.length?l.map(i=>`<article class="card item"><div class="tile" style="background:${tn(i.c)}" data-a="view" data-id="${i.id}" role="button" tabindex="0" aria-label="View ${esc(i.n)}">${tileArt(i)}</div><div class="body"><div class="fl"><h3>${esc(i.n)}</h3><button class="chip" data-a="save" data-id="${i.id}" aria-label="Save item">${saved.includes(i.id)?"♥":"♡"}</button></div><div class="price">${pr(i)}</div><div><span class="tag">${esc(i.cond)}</span> <span class="tag">${esc(i.dt)}</span>${i.out?` <span class="tag">Outside campus</span>`:""}</div><div class="hint"><b>${esc(i.s)}</b><br>${esc(i.d)}</div><div class="fl" style="justify-content:flex-start;margin-top:auto"><button class="btn dark" data-a="view" data-id="${i.id}">View</button>${i.own?`<button class="btn ghost" data-a="sold" data-id="${i.id}">Mark as sold</button>`:""}${isA()&&i.db?`<button class="btn ghost" data-a="del" data-id="${i.id}">Delete</button>`:""}</div></div></article>`).join(""):`<div class="empty">Nothing here yet. Change the filter or list your own item.</div>`;
 }
 $("#grid").onclick=e=>{const b=e.target.closest("[data-a]");if(!b)return;const id=+b.dataset.id,i=items.find(x=>x.id===id),a=b.dataset.a;
   if(a==="save"){saved=saved.includes(id)?saved.filter(x=>x!==id):[...saved,id];sv();drawGrid()}
   else if(a==="sold"){i.sold=1;if(i.db)fetch(SB+"?id=eq."+i.db,{method:"PATCH",headers:H,body:JSON.stringify({sold:true})});sv();drawGrid();toast("Marked as sold")}
+  else if(a==="del"){if(confirm("Delete this listing for everyone?"))adel(SB,i.db,pull)}
   else if(a==="view")detail(i)};
 $("#grid").onkeydown=e=>{if(e.key==="Enter"&&e.target.dataset.a==="view")e.target.click()};
 function detail(i){
@@ -553,12 +565,13 @@ $("#ok").onclick=()=>{
 };
 /* SUPPORT */
 const PROB=[["Water / RO","💧"],["Water cooler","🚰"],["Electricity","💡"],["Fan / Light","🌀"],["Wi-Fi","📶"],["Washroom","🚻"],["Classroom","🏫"],["Smart board / Projector","📽️"],["Lab equipment","🔬"],["Hostel","🛏️"],["Cleanliness","🧹"],["Canteen / Mess","🍽️"],["Road / speed breaker","🚧"],["Other","📝"]],CS=["Reported","Assigned","In progress","Resolved"];
-let cmp=load("cl_cmp2",[
+const CDEMO=([
 {id:5,tk:"CL-1005",t:"Smart board not working",cat:"Smart board / Projector",loc:"Academic Block, classroom",st:0,to:"Not assigned yet",pr:"High",own:0,v:7},
 {id:1,tk:"CL-1001",t:"Water cooler not working",cat:"Water cooler",loc:"Academic Block",st:2,to:"Estate Office · Plumbing",pr:"High",own:1,v:14},
 {id:2,tk:"CL-1002",t:"Broken speed breaker",cat:"Road / speed breaker",loc:"Main Gate Road",st:1,to:"Civil Works",pr:"Medium",own:0,v:9},
 {id:3,tk:"CL-1003",t:"Wi-Fi down on 2nd floor",cat:"Wi-Fi",loc:"Library",st:3,to:"IT Cell",pr:"Medium",own:1,v:21,note:"Router replaced on 3 Oct."},
 {id:4,tk:"CL-1004",t:"Fan not working",cat:"Fan / Light",loc:"Classroom 204",st:0,to:"Not assigned yet",pr:"Low",own:0,v:3}]);
+let cmp=[...CDEMO];
 let cf="All",ccat=PROB[0][0];
 $("#cat").innerHTML=PROB.map(c=>`<option>${c[0]}</option>`).join("");
 function drawCats(){$("#cats").innerHTML=PROB.map(([n,e])=>`<button type="button" aria-pressed="${n===ccat}" data-c="${n}"><span aria-hidden="true">${e}</span>${n}</button>`).join("");$("#cat").value=ccat}
@@ -569,25 +582,32 @@ function drawCmp(){
   $("#stats").innerHTML=`<div><b>${cmp.length}</b><small>Reported</small></div><div><b>${cmp.length-n(3)}</b><small>Open</small></div><div><b>${n(3)}</b><small>Resolved</small></div>`;
   $("#cf").innerHTML=["All","Open","Resolved","My reports"].map(t=>`<button class="chip" aria-pressed="${t===cf}" data-f="${t}">${t}</button>`).join("");
   const l=cmp.filter(c=>cf==="All"||(cf==="Open"&&c.st<3)||(cf==="Resolved"&&c.st===3)||(cf==="My reports"&&c.own));
-  $("#tickets").innerHTML=l.length?l.map(c=>`<div class="card"><div class="fl"><b>${esc(c.t)}</b><span class="pill s${c.st}">${CS[c.st]}</span></div><div class="hint">${esc(c.cat)} · ${esc(c.loc)} · ${esc(c.tk||"CL-"+(1000+c.id%1000))}</div>${c.x?`<p style="margin:8px 0 0">${esc(c.x)}</p>`:""}<div class="steps">${CS.map((s,i)=>`<div class="stp ${i<=c.st?"d":""}">${s}</div>`).join("")}</div><div class="hint">Assigned to: ${esc(c.to)}${c.own?" · Your report":""}</div>${c.note?`<p class="hint">Resolution note: ${esc(c.note)}</p>`:""}<div class="fl" style="justify-content:flex-start;flex-wrap:wrap;gap:8px;margin-top:10px"><button class="me" data-a="me" data-id="${c.id}">I face this too · ${c.v}</button>${c.st===3&&c.own&&!c.fb?`<button class="me" data-a="fix" data-id="${c.id}">Fixed ✓</button><button class="me" data-a="bad" data-id="${c.id}">Still broken</button>`:""}${c.fb?`<span class="pill">${c.fb===1?"You confirmed it is fixed":"Reopened for review"}</span>`:""}<span class="pill">${esc(c.pr)} priority</span></div></div>`).join(""):`<div class="hint">No reports here yet.</div>`;
+  $("#tickets").innerHTML=l.length?l.map(c=>`<div class="card"><div class="fl"><b>${esc(c.t)}</b><span class="pill s${c.st}">${CS[c.st]}</span></div><div class="hint">${esc(c.cat)} · ${esc(c.loc)} · ${esc(c.tk||"CL-"+(1000+c.id%1000))}</div>${c.x?`<p style="margin:8px 0 0">${esc(c.x)}</p>`:""}<div class="steps">${CS.map((s,i)=>`<div class="stp ${i<=c.st?"d":""}">${s}</div>`).join("")}</div><div class="hint">Assigned to: ${esc(c.to)}${c.own?" · Your report":""}</div>${c.note?`<p class="hint">Resolution note: ${esc(c.note)}</p>`:""}<div class="fl" style="justify-content:flex-start;flex-wrap:wrap;gap:8px;margin-top:10px"><button class="me" data-a="me" data-id="${c.id}">I face this too · ${c.v}</button>${c.st===3&&c.own&&!c.fb?`<button class="me" data-a="fix" data-id="${c.id}">Fixed ✓</button><button class="me" data-a="bad" data-id="${c.id}">Still broken</button>`:""}${c.fb?`<span class="pill">${c.fb===1?"You confirmed it is fixed":"Reopened for review"}</span>`:""}<span class="pill">${esc(c.pr)} priority</span>${isA()&&c.db?`<select data-a="st" data-id="${c.id}">${CS.map((t,i)=>`<option value="${i}" ${i===c.st?"selected":""}>${t}</option>`).join("")}</select><button class="me" data-a="asg" data-id="${c.id}">Assign</button><button class="me" data-a="cdel" data-id="${c.id}">Delete</button>`:""}</div></div>`).join(""):`<div class="hint">No reports here yet.</div>`;
 }
 $("#cf").onclick=e=>{const b=e.target.closest("button");if(b){cf=b.dataset.f;drawCmp()}};
 $("#tickets").onclick=e=>{const b=e.target.closest("[data-a]");if(!b)return;const c=cmp.find(x=>x.id==b.dataset.id),a=b.dataset.a;
+  if(a==="st"||a==="asg"||a==="cdel")return;
   if(a==="me"){if(c.m)return toast("You have already voted");c.m=1;c.v++}
   else if(a==="fix")c.fb=1;else{c.fb=2;c.st=1}
-  save("cl_cmp2",cmp);drawCmp()};
-$("#send").onclick=()=>{
+  cst[c.id]={m:c.m,fb:c.fb};save("cl_cst",cst);if(a==="me"&&c.db)fetch(SC+"?id=eq."+c.db,{method:"PATCH",headers:H,body:JSON.stringify({v:c.v})});drawCmp()};
+$("#send").onclick=async()=>{
   const x=$("#desc").value.trim(),l=$("#loc").value.trim();
   if(!x||!l){toast("Please enter both the location and the problem");return}
-  cmp.unshift({id:Date.now(),tk:"CL-"+(1005+Math.floor(Math.random()*8000)),t:ccat+" problem",x,cat:ccat,loc:l,st:0,to:"Not assigned yet",pr:$("#pri").value,own:1,v:1,m:1});save("cl_cmp2",cmp);
-  $("#desc").value=$("#loc").value="";cf="All";drawCmp();toast("Report submitted. Ticket "+cmp[0].tk);
+  const tk="CL-"+(1005+Math.floor(Math.random()*8000));
+  try{const r=await fetch(SC,{method:"POST",headers:{...H,Prefer:"return=representation"},body:JSON.stringify({tk,t:ccat+" problem",x,cat:ccat,loc:l,pr:$("#pri").value})});if(!r.ok)throw 0;const[y]=await r.json();mineC.push(y.id);save("cl_minec",mineC)}catch(e){toast("Could not submit. Check internet and try again");return}
+  $("#desc").value=$("#loc").value="";cf="All";await pullC();toast("Report submitted. Ticket "+tk)
 };
+$("#tickets").addEventListener("change",e=>{const b=e.target.closest('[data-a="st"]');if(!b||!isA())return;cupd(cmp.find(x=>x.id==b.dataset.id),{st:+b.value})});
+$("#tickets").addEventListener("click",e=>{const b=e.target.closest("[data-a]");if(!b||!isA())return;const c=cmp.find(x=>x.id==b.dataset.id);
+  if(b.dataset.a==="asg"){const v=prompt("Assign to (department or person)",c.to);if(v)cupd(c,{assigned:v.slice(0,80)})}
+  else if(b.dataset.a==="cdel"&&confirm("Delete this report for everyone?"))adel(SC,c.db,pullC)});
 /* LOGIN */
-const UNIS=["Central University of South Bihar"],RL={student:"Student",out:"Outsider",drv:"E-rickshaw driver"};
+const UNIS=["Central University of South Bihar"],RL={student:"Student",out:"Outsider",drv:"E-rickshaw driver",adm:"Admin"};
 let lr="student",lu="";
 function showU(){$("#lub").innerHTML=lu?`<div class="ud" style="margin:12px 0 0"><span class="logo" role="img" aria-label="CUSB logo"></span><b>${esc(lu)}</b></div>`:""}
 function drawLogin(){
-  $("#lrole").innerHTML=[["student","Student"],["drv","E-rickshaw driver"],["out","Outsider"]].map(([k,t])=>`<button class="chip" aria-pressed="${k===lr}" data-k="${k}">${t}</button>`).join("");
+  $("#lrole").innerHTML=[["student","Student"],["drv","E-rickshaw driver"],["out","Outsider"],["adm","Admin"]].map(([k,t])=>`<button class="chip" aria-pressed="${k===lr}" data-k="${k}">${t}</button>`).join("");
+  if(lr==="adm"){$("#lf").innerHTML=`<label for="an">Admin name</label><input id="an" autocomplete="username"><label for="ap">Password</label><input id="ap" type="password" autocomplete="current-password"><div class="hint" style="margin-top:10px">Admin can delete any listing or report.</div>`;return}
   const U=`<label for="lu">University</label><select id="lu"><option value="">Select your university</option>${UNIS.map(u=>`<option>${u}</option>`).join("")}</select><div id="lub"></div><label for="ln">Full name</label><input id="ln" autocomplete="name">`;
   $("#lf").innerHTML=U+(lr==="student"?`<label for="li">University email or enrollment number</label><input id="li" autocomplete="email"><div class="hint" style="margin-top:10px">You get the full app: rides, bazaar and support.</div>`:lr==="drv"?`<label for="lp">Mobile number (10 digits)</label><input id="lp" inputmode="numeric" maxlength="10" autocomplete="tel"><label for="lv">E-rickshaw number</label><input id="lv" placeholder="e.g. BR 02 E 1234"><div class="hint" style="margin-top:10px">Drivers get the Driver desk: ride requests, earnings and history.</div>`:`<label for="lp">Mobile number (10 digits)</label><input id="lp" inputmode="numeric" maxlength="10" autocomplete="tel"><label for="la">Area (e.g. Panchanpur)</label><input id="la"><div class="hint" style="margin-top:10px">Outsiders can only use the Bazaar, to list rooms, meals and items for the university community.</div>`);
   $("#lu").value=lu;showU();
@@ -595,6 +615,7 @@ function drawLogin(){
 $("#lrole").onclick=e=>{const b=e.target.closest("button");if(b){lr=b.dataset.k;drawLogin()}};
 $("#lf").onchange=e=>{if(e.target.id==="lu"){lu=e.target.value;showU()}};
 $("#lgo").onclick=()=>{
+  if(lr==="adm")return adminLogin();
   if(!lu){toast("Please select your university");return}
   const nm=$("#ln").value.trim();
   if(!nm){toast("Please enter your name");return}
@@ -604,7 +625,7 @@ $("#lgo").onclick=()=>{
     else user={role:"out",name:nm,phone:ph,area:$("#la").value.trim(),uni:lu}}
   save("cl_user",user);applyUser();
 };
-function applyUser(){
+function applyUser(){if(!user||user.role!=="adm"){adm=null;try{localStorage.removeItem("cl_adm")}catch(e){}}drawGrid();drawCmp();
   const r=user?user.role:"",out=r==="out",drv=r==="drv";
   $("#login").hidden=!!user;document.body.classList.toggle("out",out||drv);$("#obn").hidden=!out;$("#uni").hidden=!user;$("#un").textContent=(user&&user.uni)||UNIS[0];
   $("#who").innerHTML=user?`<div class="wh">${esc(user.name)}<small>${RL[r]}</small></div><button class="chip" id="lo">Log out</button>`:"";
@@ -706,7 +727,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")openMenu(false)});
 drawRoute();drawLive();drawRides();drawTabs();drawGrid();drawCmp();
 applyUser();
 simStart();
-pull();
+pull();pullC();
 </script>
 </body>
 </html>
