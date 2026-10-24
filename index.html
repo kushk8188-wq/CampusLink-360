@@ -489,7 +489,7 @@ const tileArt=i=>(i.img||i.ph)?`<div class="pic" style="background-image:${i.img
 const CATS=["Books","Notes","Calculator","Bicycle","Electronics","Hostel items","Furniture","Clothes","Lab coat","Rooms / Rent","Meals / Food","Other"];
 const EM={Books:"📗",Notes:"📒",Calculator:"🧮",Bicycle:"🚲",Electronics:"💻","Hostel items":"🛏️",Furniture:"🪑",Clothes:"👕","Lab coat":"🥼","Rooms / Rent":"🏠","Meals / Food":"🍛",Other:"📦"};
 const TN=["#DFF5E8","#FFF1C7","#E4E9FF","#DCF2F4","#DCE7FF","#FFE4D2","#EDE4FF","#FFE3E8","#E7E9EF","#DDF1E4","#FFE9C7","#E7E9EF"],tn=c=>TN[CATS.indexOf(c)]||TN[11];
-let items=load("cl_items4",[
+const DEMO=([
 {id:1,n:"Ecology textbook, 5th edition",p:280,c:"Books",cond:"Good",s:"Amit Kumar",d:"Environment Science • 2nd Year",e:"📗",ph:"bk",dt:"Yesterday",ds:"Clean copy, minimal highlighting. Includes last year's notes."},
 {id:2,n:"Casio fx-991 calculator",p:650,c:"Calculator",cond:"Like new",s:"Rahul Raj",d:"Computer Science • 3rd Year",e:"🧮",ph:"calc",dt:"Today",ds:"Used for one semester. Cover and manual included."},
 {id:3,n:"Hero Sprint cycle",p:3200,c:"Bicycle",cond:"Used",s:"Dr. M. Jha",d:"Faculty • Geography",e:"🚲",ph:"cyc",dt:"1 week ago",ds:"Well kept, new tyres. Ideal for hostel to department."},
@@ -504,8 +504,14 @@ let items=load("cl_items4",[
 {id:12,n:"Hotel food, 2 meals a day (Panchanpur)",p:3500,u:"/month",c:"Meals / Food",cond:"2 meals a day",s:"Local hotel",d:"Outside seller · Panchanpur",dt:"Today",out:1,ph:"ml1",ds:"Two meals a day. Roti, rice, dal and sandwich."},
 {id:13,n:"Hostel room, 3 students sharing",p:4500,u:"per room / month",per:1500,c:"Rooms / Rent",cond:"Triple room",s:"Local hostel owner",d:"Outside seller",dt:"Today",out:1,ph:"r3",ds:"Room for 3 students sharing. ₹4,500 per room, ₹1,500 each student."},
 {id:14,n:"DSLR camera with kit lens",p:22000,c:"Electronics",cond:"Good",s:"Student seller",d:"CUSB student",dt:"2 days ago",ph:"cam",ds:"DSLR camera with a kit lens, in good working condition."}]);
+let items=[...DEMO];
 let saved=load("cl_saved",[]),tab="Browse",cat="All",qs="",sortBy="new";
-const sv=()=>{save("cl_items4",items);save("cl_saved",saved)};
+const sv=()=>save("cl_saved",saved);
+const SB="https://okezsutcryfhimyiqmxd.supabase.co/rest/v1/items",H={apikey:"sb_publishable_pfhK5rqSG0RkzUw-37__FA_L6RlPhrq","Content-Type":"application/json"};
+let mine=load("cl_mine",[]);
+const ago=t=>{const m=(Date.now()-new Date(t))/6e4;return m<2?"Just now":m<60?Math.floor(m)+" min ago":m<1440?Math.floor(m/60)+" hr ago":Math.floor(m/1440)+" days ago"};
+async function pull(){try{const r=await fetch(SB+"?select=*&sold=eq.false&order=created_at.desc&limit=40",{headers:H});if(!r.ok)throw 0;const rows=await r.json();
+  items=[...rows.map(x=>({id:x.id+1000,db:x.id,n:x.n,c:x.c,p:+x.p,u:x.u||"",per:+x.per||0,cond:x.cond||"",s:x.s,d:x.d||"",out:x.outside?1:0,ds:x.ds||"",w:x.w||"",img:x.img||"",dt:ago(x.created_at),own:mine.includes(x.id)?1:0})),...DEMO];drawGrid()}catch(e){toast("Could not load shared listings")}}
 function drawTabs(){
   $("#tabs").innerHTML=["Browse","Outside campus","Saved","My listings","Free"].map(c=>`<button class="chip" aria-pressed="${c===tab}" data-t="${c}">${c}</button>`).join("");
   $("#chips").innerHTML=["All",...CATS].map(c=>`<button class="chip" aria-pressed="${c===cat}" data-c="${c}">${c}</button>`).join("");
@@ -519,7 +525,7 @@ function drawGrid(){
 }
 $("#grid").onclick=e=>{const b=e.target.closest("[data-a]");if(!b)return;const id=+b.dataset.id,i=items.find(x=>x.id===id),a=b.dataset.a;
   if(a==="save"){saved=saved.includes(id)?saved.filter(x=>x!==id):[...saved,id];sv();drawGrid()}
-  else if(a==="sold"){i.sold=1;sv();drawGrid();toast("Marked as sold")}
+  else if(a==="sold"){i.sold=1;if(i.db)fetch(SB+"?id=eq."+i.db,{method:"PATCH",headers:H,body:JSON.stringify({sold:true})});sv();drawGrid();toast("Marked as sold")}
   else if(a==="view")detail(i)};
 $("#grid").onkeydown=e=>{if(e.key==="Enter"&&e.target.dataset.a==="view")e.target.click()};
 function detail(i){
@@ -538,8 +544,10 @@ $("#ok").onclick=()=>{
   const n=$("#t").value.trim(),p=$("#p").value,w=$("#w").value.trim(),fl=$("#ph").files&&$("#ph").files[0];
   if(!n||p===""){toast("Enter a title and price (0 for free)");return}
   if(w&&!/^\d{10}$/.test(w)){toast("Number must be 10 digits");return}
-  const fin=img=>{const out=!!user&&user.role==="out",ar=$("#ar").value.trim(),c=$("#c").value;
-    items.unshift({id:Date.now(),n,c,p:+p,u:$("#u").value,per:+$("#pe").value||0,cond:$("#d").value,s:user?user.name:"You",d:(out?"Outside seller":"Student")+(ar?" · "+ar:""),dt:"Just now",own:1,out:out?1:0,ds:$("#ds").value.trim(),w,img});sv();
+  const fin=async img=>{const out=!!user&&user.role==="out",ar=$("#ar").value.trim(),c=$("#c").value;
+    const row={n,c,p:+p,u:$("#u").value,per:+$("#pe").value||0,cond:$("#d").value,s:user?user.name:"You",d:(out?"Outside seller":"Student")+(ar?" · "+ar:""),outside:out,ds:$("#ds").value.trim(),w:w||"",img:img||""};
+    try{const r=await fetch(SB,{method:"POST",headers:{...H,Prefer:"return=representation"},body:JSON.stringify(row)});if(!r.ok)throw 0;const[x]=await r.json();mine.push(x.id);save("cl_mine",mine)}catch(e){toast("Could not post. Check internet and try again");return}
+    await pull();
     ["#t","#p","#w","#ds","#ar","#pe"].forEach(s=>$(s).value="");$("#ph").value="";$("#dlg").close();tab="My listings";cat="All";drawTabs();drawGrid();toast("Listing posted")};
   fl?shrink(fl,fin):fin("");
 };
@@ -698,6 +706,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")openMenu(false)});
 drawRoute();drawLive();drawRides();drawTabs();drawGrid();drawCmp();
 applyUser();
 simStart();
+pull();
 </script>
 </body>
 </html>
